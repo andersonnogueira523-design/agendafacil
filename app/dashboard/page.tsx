@@ -6,7 +6,10 @@ import { ptBR } from "date-fns/locale";
 export default async function DashboardPage() {
   const tenant = await getTenant();
   const hoje = new Date();
-  const where = { tenantId: tenant.id, dataHora: { gte: startOfDay(hoje), lte: endOfDay(hoje) } };
+  const where = {
+    tenantId: tenant.id,
+    dataHora: { gte: startOfDay(hoje), lte: endOfDay(hoje) },
+  };
 
   const [agendamentos, total, confirmados, cancelados] = await Promise.all([
     prisma.agendamento.findMany({
@@ -21,76 +24,93 @@ export default async function DashboardPage() {
 
   const taxa = total > 0 ? Math.round((confirmados / total) * 100) : 0;
 
-  const statusColor: Record<string, string> = {
-    CONFIRMADO: "bg-green-100 text-green-700",
-    CANCELADO: "bg-red-100 text-red-700",
-    PENDENTE: "bg-yellow-100 text-yellow-700",
-    CONCLUIDO: "bg-gray-100 text-gray-600",
-    NO_SHOW: "bg-orange-100 text-orange-700",
+  const statusStyle: Record<string, { bg: string; text: string; label: string }> = {
+    CONFIRMADO: { bg: "#E1F5EE", text: "#085041", label: "✓ Confirmado" },
+    CANCELADO:  { bg: "#FCEBEB", text: "#791F1F", label: "✕ Cancelou" },
+    PENDENTE:   { bg: "#FAEEDA", text: "#633806", label: "⏳ Aguardando" },
+    CONCLUIDO:  { bg: "#F0F0F0", text: "#555",    label: "✓ Concluído" },
+    NO_SHOW:    { bg: "#FFF0E6", text: "#7A3A00", label: "✕ No-show" },
   };
 
-  const statusLabel: Record<string, string> = {
-    CONFIRMADO: "Confirmado", CANCELADO: "Cancelou",
-    PENDENTE: "Aguardando", CONCLUIDO: "Concluido", NO_SHOW: "No-show",
-  };
+  const colors = ["#EEEDFE", "#E1F5EE", "#FAECE7", "#E6F1FB", "#FAEEDA"];
+  const textColors = ["#3C3489", "#085041", "#712B13", "#0C447C", "#633806"];
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div style={{ minHeight: "100vh", background: "#F7F8FA", fontFamily: "Inter, system-ui, sans-serif" }}>
+      {/* Header */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 className="text-lg font-medium text-gray-900">AgendaFacil</h1>
-          <p className="text-sm text-gray-500">{tenant.nome}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 22 }}>📅</span>
+            <span style={{ fontSize: 18, fontWeight: 600, color: "#111" }}>AgendaFácil</span>
+          </div>
+          <div style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{tenant.nome}</div>
         </div>
-        <span className="text-sm text-gray-500">
+        <div style={{ fontSize: 13, color: "#6B7280", background: "#F3F4F6", padding: "6px 14px", borderRadius: 8 }}>
           {format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}
-        </span>
-      </header>
+        </div>
+      </div>
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "32px 24px" }}>
+
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
           {[
-            { label: "Agendamentos hoje", value: total, color: "text-blue-600" },
-            { label: "Confirmados", value: confirmados, color: "text-green-600" },
-            { label: "Cancelados", value: cancelados, color: "text-red-500" },
-            { label: "Taxa de confirmacao", value: `${taxa}%`, color: "text-green-600" },
+            { label: "Agendamentos hoje", value: total,       color: "#2563EB" },
+            { label: "Confirmados",        value: confirmados, color: "#059669" },
+            { label: "Cancelados",         value: cancelados,  color: "#DC2626" },
+            { label: "Taxa de confirmação", value: `${taxa}%`, color: "#059669" },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4">
-              <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-              <p className={`text-2xl font-medium ${s.color}`}>{s.value}</p>
+            <div key={s.label} style={{ background: "#fff", borderRadius: 14, border: "1px solid #E5E7EB", padding: "18px 20px" }}>
+              <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 6 }}>{s.label}</div>
+              <div style={{ fontSize: 26, fontWeight: 600, color: s.color }}>{s.value}</div>
             </div>
           ))}
         </div>
 
         {/* Agenda */}
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-medium text-gray-700">Agenda de hoje</h2>
+        <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #E5E7EB", overflow: "hidden" }}>
+          <div style={{ padding: "18px 24px", borderBottom: "1px solid #F3F4F6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>Agenda de hoje</span>
+            <span style={{ fontSize: 12, color: "#9CA3AF" }}>{total} agendamento{total !== 1 ? "s" : ""}</span>
           </div>
-          <div className="divide-y divide-gray-100">
-            {agendamentos.length === 0 && (
-              <p className="px-5 py-8 text-sm text-gray-400 text-center">Nenhum agendamento para hoje.</p>
-            )}
-            {agendamentos.map((a) => (
-              <div key={a.id} className="px-5 py-3 flex items-center gap-4">
-                <span className="text-sm font-medium text-gray-700 w-12 shrink-0">
-                  {format(a.dataHora, "HH:mm")}
-                </span>
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-xs font-medium flex items-center justify-center shrink-0">
-                  {a.cliente.nome.slice(0, 2).toUpperCase()}
+
+          {agendamentos.length === 0 ? (
+            <div style={{ padding: "48px 24px", textAlign: "center", color: "#9CA3AF", fontSize: 14 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+              Nenhum agendamento para hoje.
+            </div>
+          ) : (
+            agendamentos.map((a, i) => {
+              const s = statusStyle[a.status] ?? statusStyle.PENDENTE;
+              const ci = i % 5;
+              const initials = a.cliente.nome.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
+              return (
+                <div key={a.id} style={{ padding: "14px 24px", borderBottom: "1px solid #F9FAFB", display: "flex", alignItems: "center", gap: 14 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", width: 44, flexShrink: 0 }}>
+                    {format(a.dataHora, "HH:mm")}
+                  </span>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: colors[ci], color: textColors[ci], fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {initials}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#111" }}>{a.cliente.nome}</div>
+                    <div style={{ fontSize: 12, color: "#6B7280" }}>{a.servico}</div>
+                  </div>
+                  <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 20, background: s.bg, color: s.text, fontWeight: 500, whiteSpace: "nowrap" }}>
+                    {s.label}
+                  </span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{a.cliente.nome}</p>
-                  <p className="text-xs text-gray-500">{a.servico}</p>
-                </div>
-                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColor[a.status]}`}>
-                  {statusLabel[a.status]}
-                </span>
-              </div>
-            ))}
-          </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Rodapé */}
+        <div style={{ marginTop: 24, textAlign: "center", fontSize: 12, color: "#D1D5DB" }}>
+          AgendaFácil · Confirmação automática por WhatsApp
         </div>
       </div>
-    </main>
+    </div>
   );
 }
