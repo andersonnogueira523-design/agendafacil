@@ -12,7 +12,7 @@ export async function GET() {
         "Client-Token": KEY,
       },
       body: JSON.stringify({
-        phone: "5533998393101",
+        phone: "553398393101",
         message: "Teste AgendaFacil!",
       }),
     });
