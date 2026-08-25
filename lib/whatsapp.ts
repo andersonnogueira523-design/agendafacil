@@ -1,12 +1,17 @@
 const BASE = process.env.EVOLUTION_API_URL!;
-const KEY  = process.env.EVOLUTION_API_KEY!;
 
 export async function enviarMensagem(telefone: string, texto: string) {
-  const res = await fetch(`${BASE}/message/sendText`, {
+  const res = await fetch(`${BASE}/send-text`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", apikey: KEY },
-    body: JSON.stringify({ number: telefone, text: texto }),
+    headers: {
+      "Content-Type": "application/json",
+      "Client-Token": process.env.EVOLUTION_API_KEY!,
+    },
+    body: JSON.stringify({
+      phone: telefone,
+      message: texto,
+    }),
   });
-  if (!res.ok) throw new Error(`Evolution API error: ${res.status}`);
+  if (!res.ok) throw new Error(`Z-API error: ${res.status}`);
   return res.json();
 }
