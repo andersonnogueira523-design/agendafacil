@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getTenant } from "@/lib/tenant";
-import { startOfDay, endOfDay, parseISO } from "date-fns";
+import { startOfDay, endOfDay, parseISO, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { enviarMensagem } from "@/lib/whatsapp";
+import { montarMensagem } from "@/lib/tenant";
 
 const schema = z.object({
   clienteId: z.string().uuid(),
@@ -47,6 +50,22 @@ export async function POST(req: NextRequest) {
     });
 
     await prisma.cliente.update({ where: { id: input.clienteId }, data: { totalVisitas: { increment: 1 } } });
+
+    // Envia mensagem de confirmação de agendamento imediatamente
+    try {
+      const dataHora = new Date(input.dataHora);
+      const dataFormatada = format(dataHora, "dd/MM", { locale: ptBR });
+      const horario = format(dataHora, "HH:mm");
+      const primeiroNome = cliente.nome.split(" ")[0];
+
+      const textoConfirmacao = `Oi ${primeiroNome}! 😊\n\nSeu agendamento de *${input.servico}* foi marcado para *${dataFormatada} às ${horario}*.\n\nQualquer dúvida estamos à disposição!`;
+
+      await enviarMensagem(cliente.telefone, textoConfirmacao);
+    } catch (e) {
+      console.error("Erro ao enviar mensagem de confirmação:", e);
+      // Não bloqueia o cadastro se o WhatsApp falhar
+    }
+
     return NextResponse.json({ data: agendamento }, { status: 201 });
   } catch (e: unknown) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: e.errors[0].message }, { status: 422 });

@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { enviarMensagem } from "@/lib/whatsapp";
 import { montarMensagem } from "@/lib/tenant";
-import { addHours, isAfter, isBefore } from "date-fns";
+import { addHours, isAfter, isBefore, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET() {
   const agora = new Date();
@@ -13,11 +15,17 @@ export async function GET() {
 
   const mensagens = await prisma.mensagem.findMany({
     where: {
+      tipo: "CONFIRMACAO_2H",
       status: "PENDENTE",
-      agendamento: { status: "PENDENTE", dataHora: { gt: agora } },
+      agendamento: {
+        status: "PENDENTE",
+        dataHora: { gt: agora },
+      },
     },
     include: {
-      agendamento: { include: { cliente: true, tenant: true } },
+      agendamento: {
+        include: { cliente: true, tenant: true },
+      },
     },
   });
 
@@ -26,19 +34,32 @@ export async function GET() {
     const { cliente, tenant } = agendamento;
     const dataHora = new Date(agendamento.dataHora);
 
-    const d24 = msg.tipo === "CONFIRMACAO_24H" && isAfter(agora, addHours(dataHora, -25)) && isBefore(agora, addHours(dataHora, -23));
-    const d2 = msg.tipo === "CONFIRMACAO_2H" && isAfter(agora, addHours(dataHora, -2.5)) && isBefore(agora, addHours(dataHora, -1.5));
+    // Envia entre 2h30 e 1h30 antes do agendamento
+    const deveEnviar =
+      isAfter(agora, addHours(dataHora, -2.5)) &&
+      isBefore(agora, addHours(dataHora, -1.5));
 
-    if (!d24 && !d2) continue;
+    if (!deveEnviar) continue;
 
     try {
-      const horario = dataHora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      const texto = montarMensagem(tenant.msgTemplate, { nome: cliente.nome.split(" ")[0], servico: agendamento.servico, horario });
+      const horario = format(dataHora, "HH:mm", { locale: ptBR });
+      const texto = montarMensagem(tenant.msgTemplate, {
+        nome: cliente.nome.split(" ")[0],
+        servico: agendamento.servico,
+        horario,
+      });
+
       await enviarMensagem(cliente.telefone, texto);
-      await prisma.mensagem.update({ where: { id: msg.id }, data: { status: "ENVIADA", enviadaEm: new Date() } });
+      await prisma.mensagem.update({
+        where: { id: msg.id },
+        data: { status: "ENVIADA", enviadaEm: new Date() },
+      });
       enviadas++;
     } catch {
-      await prisma.mensagem.update({ where: { id: msg.id }, data: { status: "ERRO" } });
+      await prisma.mensagem.update({
+        where: { id: msg.id },
+        data: { status: "ERRO" },
+      });
       erros++;
     }
   }
