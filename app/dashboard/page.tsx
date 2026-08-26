@@ -331,7 +331,7 @@ export default function DashboardPage() {
                   <input value={formConfig.nome} onChange={e => setFormConfig({...formConfig, nome: e.target.value})} placeholder="Salão Beleza & Arte" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>WhatsApp do negócio (com DDI+DDD)</label>
+                  <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>WhatsApp do negócio (com DDD)</label>
                   <input value={formConfig.whatsappNumber} onChange={e => setFormConfig({...formConfig, whatsappNumber: e.target.value})} placeholder="5533999999999" style={inputStyle} />
                   <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Número que aparecerá como remetente das mensagens.</p>
                 </div>
@@ -392,7 +392,7 @@ export default function DashboardPage() {
                 <input required value={formCliente.nome} onChange={e => setFormCliente({...formCliente, nome: e.target.value})} placeholder="Maria Silva" style={inputStyle} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>WhatsApp (com DDI+DDD)</label>
+                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>WhatsApp (com DDD)</label>
                 <input required value={formCliente.telefone} onChange={e => setFormCliente({...formCliente, telefone: e.target.value})} placeholder="5533999999999" style={inputStyle} />
               </div>
               <div>
