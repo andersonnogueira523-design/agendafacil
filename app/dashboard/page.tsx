@@ -18,6 +18,13 @@ interface Agendamento {
   cliente: Cliente;
 }
 
+interface Tenant {
+  id: string;
+  nome: string;
+  whatsappNumber: string;
+  msgTemplate: string;
+}
+
 const statusStyle: Record<string, { bg: string; text: string; label: string }> = {
   CONFIRMADO: { bg: "#E1F5EE", text: "#085041", label: "✓ Confirmado" },
   CANCELADO:  { bg: "#FCEBEB", text: "#791F1F", label: "✕ Cancelou" },
@@ -41,19 +48,29 @@ function initials(nome: string) {
   return nome.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 }
 
+const inputStyle = {
+  width: "100%",
+  border: "1px solid #E5E7EB",
+  borderRadius: 8,
+  padding: "8px 12px",
+  fontSize: 14,
+  boxSizing: "border-box" as const,
+};
+
 export default function DashboardPage() {
-  const [aba, setAba] = useState<"dashboard"|"clientes"|"agendamentos">("dashboard");
+  const [aba, setAba] = useState<"dashboard"|"clientes"|"agendamentos"|"config">("dashboard");
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Modais
   const [modalCliente, setModalCliente] = useState(false);
   const [modalAgendamento, setModalAgendamento] = useState(false);
 
-  // Forms
   const [formCliente, setFormCliente] = useState({ nome: "", telefone: "", servicoFavorito: "" });
   const [formAgend, setFormAgend] = useState({ clienteId: "", servico: "", dataHora: "" });
+  const [formConfig, setFormConfig] = useState({ nome: "", whatsappNumber: "", msgTemplate: "" });
+
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
 
@@ -62,12 +79,21 @@ export default function DashboardPage() {
   async function carregarDados() {
     setLoading(true);
     try {
-      const [c, a] = await Promise.all([
+      const [c, a, t] = await Promise.all([
         fetch("/api/clientes").then(r => r.json()),
         fetch(`/api/agendamentos?data=${new Date().toISOString().slice(0,10)}`).then(r => r.json()),
+        fetch("/api/tenant").then(r => r.json()),
       ]);
       setClientes(c.data ?? []);
       setAgendamentos(a.data ?? []);
+      if (t.data) {
+        setTenant(t.data);
+        setFormConfig({
+          nome: t.data.nome,
+          whatsappNumber: t.data.whatsappNumber,
+          msgTemplate: t.data.msgTemplate,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -107,6 +133,24 @@ export default function DashboardPage() {
     carregarDados();
   }
 
+  async function salvarConfig(e: React.FormEvent) {
+    e.preventDefault();
+    setErro(""); setSucesso("");
+    const res = await fetch("/api/tenant", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: formConfig.nome,
+        whatsappNumber: formConfig.whatsappNumber.replace(/\D/g,""),
+        msgTemplate: formConfig.msgTemplate,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setErro(data.error ?? "Erro ao salvar"); return; }
+    setSucesso("Configurações salvas!");
+    carregarDados();
+  }
+
   async function atualizarStatus(id: string, status: string) {
     await fetch(`/api/agendamentos/${id}`, {
       method: "PATCH",
@@ -121,21 +165,30 @@ export default function DashboardPage() {
   const cancelados = agendamentos.filter(a => a.status === "CANCELADO").length;
   const taxa = total > 0 ? Math.round((confirmados / total) * 100) : 0;
 
-  const s = { fontFamily: "Inter, system-ui, sans-serif", fontSize: 14 };
+  const abas = [
+    { key: "dashboard", label: "Dashboard" },
+    { key: "clientes", label: "Clientes" },
+    { key: "agendamentos", label: "Agendamentos" },
+    { key: "config", label: "⚙ Configurações" },
+  ] as const;
 
   return (
-    <div style={{ ...s, minHeight: "100vh", background: "#F7F8FA" }}>
+    <div style={{ minHeight: "100vh", background: "#F7F8FA", fontFamily: "Inter, system-ui, sans-serif", fontSize: 14 }}>
 
       {/* Header */}
-      <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>📅</span>
-          <span style={{ fontSize: 17, fontWeight: 600, color: "#111" }}>AgendaFácil</span>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#111" }}>AgendaFácil</div>
+            {tenant && <div style={{ fontSize: 12, color: "#6B7280" }}>{tenant.nome}</div>}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {(["dashboard","clientes","agendamentos"] as const).map(a => (
-            <button key={a} onClick={() => setAba(a)} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: aba === a ? 600 : 400, background: aba === a ? "#EEF2FF" : "transparent", color: aba === a ? "#4338CA" : "#6B7280" }}>
-              {a === "dashboard" ? "Dashboard" : a === "clientes" ? "Clientes" : "Agendamentos"}
+        <div style={{ display: "flex", gap: 4 }}>
+          {abas.map(a => (
+            <button key={a.key} onClick={() => { setAba(a.key); setSucesso(""); setErro(""); }}
+              style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: aba === a.key ? 600 : 400, background: aba === a.key ? "#EEF2FF" : "transparent", color: aba === a.key ? "#4338CA" : "#6B7280" }}>
+              {a.label}
             </button>
           ))}
         </div>
@@ -145,6 +198,7 @@ export default function DashboardPage() {
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 20px" }}>
 
         {sucesso && <div style={{ background: "#E1F5EE", color: "#085041", padding: "10px 16px", borderRadius: 10, marginBottom: 16, fontSize: 13 }}>✓ {sucesso}</div>}
+        {erro && <div style={{ background: "#FEF2F2", color: "#DC2626", padding: "10px 16px", borderRadius: 10, marginBottom: 16, fontSize: 13 }}>{erro}</div>}
 
         {/* DASHBOARD */}
         {aba === "dashboard" && (
@@ -162,35 +216,35 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-
             <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #E5E7EB", overflow: "hidden" }}>
               <div style={{ padding: "16px 22px", borderBottom: "1px solid #F3F4F6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontWeight: 600, color: "#111" }}>Agenda de hoje</span>
                 <button onClick={() => setModalAgendamento(true)} style={{ background: "#4338CA", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Novo agendamento</button>
               </div>
               {loading ? <div style={{ padding: 32, textAlign: "center", color: "#9CA3AF" }}>Carregando...</div> :
-                agendamentos.length === 0 ? <div style={{ padding: "40px 24px", textAlign: "center", color: "#9CA3AF", fontSize: 14 }}><div style={{ fontSize: 30, marginBottom: 8 }}>📭</div>Nenhum agendamento para hoje.</div> :
-                agendamentos.map((a, i) => {
-                  const st = statusStyle[a.status] ?? statusStyle.PENDENTE;
-                  const ci = i % 5;
-                  return (
-                    <div key={a.id} style={{ padding: "13px 22px", borderBottom: "1px solid #F9FAFB", display: "flex", alignItems: "center", gap: 12 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", width: 42, flexShrink: 0 }}>{formatHora(a.dataHora)}</span>
-                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: colors[ci], color: textColors[ci], fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{initials(a.cliente.nome)}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 500, color: "#111" }}>{a.cliente.nome}</div>
-                        <div style={{ fontSize: 12, color: "#6B7280" }}>{a.servico}</div>
-                      </div>
-                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: st.bg, color: st.text, fontWeight: 500 }}>{st.label}</span>
-                      {a.status === "PENDENTE" && (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button onClick={() => atualizarStatus(a.id, "CONFIRMADO")} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #059669", background: "#fff", color: "#059669", cursor: "pointer" }}>Confirmar</button>
-                          <button onClick={() => atualizarStatus(a.id, "CANCELADO")} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #DC2626", background: "#fff", color: "#DC2626", cursor: "pointer" }}>Cancelar</button>
+                agendamentos.length === 0
+                  ? <div style={{ padding: "40px 24px", textAlign: "center", color: "#9CA3AF" }}><div style={{ fontSize: 30, marginBottom: 8 }}>📭</div>Nenhum agendamento para hoje.</div>
+                  : agendamentos.map((a, i) => {
+                    const st = statusStyle[a.status] ?? statusStyle.PENDENTE;
+                    const ci = i % 5;
+                    return (
+                      <div key={a.id} style={{ padding: "13px 22px", borderBottom: "1px solid #F9FAFB", display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", width: 42, flexShrink: 0 }}>{formatHora(a.dataHora)}</span>
+                        <div style={{ width: 34, height: 34, borderRadius: "50%", background: colors[ci], color: textColors[ci], fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{initials(a.cliente.nome)}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 500, color: "#111" }}>{a.cliente.nome}</div>
+                          <div style={{ fontSize: 12, color: "#6B7280" }}>{a.servico}</div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })
+                        <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: st.bg, color: st.text, fontWeight: 500 }}>{st.label}</span>
+                        {a.status === "PENDENTE" && (
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button onClick={() => atualizarStatus(a.id, "CONFIRMADO")} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #059669", background: "#fff", color: "#059669", cursor: "pointer" }}>Confirmar</button>
+                            <button onClick={() => atualizarStatus(a.id, "CANCELADO")} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #DC2626", background: "#fff", color: "#DC2626", cursor: "pointer" }}>Cancelar</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
               }
             </div>
           </>
@@ -203,8 +257,9 @@ export default function DashboardPage() {
               <span style={{ fontWeight: 600, color: "#111" }}>Clientes ({clientes.length})</span>
               <button onClick={() => setModalCliente(true)} style={{ background: "#4338CA", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Novo cliente</button>
             </div>
-            {clientes.length === 0 ? <div style={{ padding: "40px 24px", textAlign: "center", color: "#9CA3AF" }}><div style={{ fontSize: 30, marginBottom: 8 }}>👥</div>Nenhum cliente cadastrado.</div> :
-              clientes.map((c, i) => {
+            {clientes.length === 0
+              ? <div style={{ padding: "40px 24px", textAlign: "center", color: "#9CA3AF" }}><div style={{ fontSize: 30, marginBottom: 8 }}>👥</div>Nenhum cliente cadastrado.</div>
+              : clientes.map((c, i) => {
                 const ci = i % 5;
                 return (
                   <div key={c.id} style={{ padding: "13px 22px", borderBottom: "1px solid #F9FAFB", display: "flex", alignItems: "center", gap: 12 }}>
@@ -225,11 +280,12 @@ export default function DashboardPage() {
         {aba === "agendamentos" && (
           <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #E5E7EB", overflow: "hidden" }}>
             <div style={{ padding: "16px 22px", borderBottom: "1px solid #F3F4F6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontWeight: 600, color: "#111" }}>Todos os agendamentos</span>
+              <span style={{ fontWeight: 600, color: "#111" }}>Agendamentos de hoje</span>
               <button onClick={() => setModalAgendamento(true)} style={{ background: "#4338CA", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Novo agendamento</button>
             </div>
-            {agendamentos.length === 0 ? <div style={{ padding: "40px 24px", textAlign: "center", color: "#9CA3AF" }}>Nenhum agendamento hoje.</div> :
-              agendamentos.map((a, i) => {
+            {agendamentos.length === 0
+              ? <div style={{ padding: "40px 24px", textAlign: "center", color: "#9CA3AF" }}>Nenhum agendamento hoje.</div>
+              : agendamentos.map((a, i) => {
                 const st = statusStyle[a.status] ?? statusStyle.PENDENTE;
                 const ci = i % 5;
                 return (
@@ -246,6 +302,49 @@ export default function DashboardPage() {
             }
           </div>
         )}
+
+        {/* CONFIGURAÇÕES */}
+        {aba === "config" && (
+          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #E5E7EB", padding: 28 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: "#111", marginBottom: 6 }}>Configurações do negócio</h2>
+            <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 24 }}>Edite as informações do seu negócio e personalize a mensagem enviada aos clientes.</p>
+            <form onSubmit={salvarConfig} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <div>
+                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>Nome do negócio</label>
+                <input value={formConfig.nome} onChange={e => setFormConfig({...formConfig, nome: e.target.value})} placeholder="Salão Beleza & Arte" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>WhatsApp do negócio (com DDI+DDD)</label>
+                <input value={formConfig.whatsappNumber} onChange={e => setFormConfig({...formConfig, whatsappNumber: e.target.value})} placeholder="5533999999999" style={inputStyle} />
+                <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Número que aparecerá como remetente das mensagens.</p>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>Mensagem de confirmação</label>
+                <textarea
+                  value={formConfig.msgTemplate}
+                  onChange={e => setFormConfig({...formConfig, msgTemplate: e.target.value})}
+                  rows={4}
+                  style={{ ...inputStyle, resize: "vertical" as const }}
+                />
+                <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Use <strong>{"{nome}"}</strong>, <strong>{"{servico}"}</strong> e <strong>{"{horario}"}</strong> para personalizar.</p>
+              </div>
+
+              <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "14px 16px", border: "1px solid #E5E7EB" }}>
+                <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 8, fontWeight: 500 }}>Preview da mensagem</div>
+                <div style={{ fontSize: 13, color: "#111", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                  {formConfig.msgTemplate
+                    .replace(/{nome}/g, "Maria Silva")
+                    .replace(/{servico}/g, "Corte")
+                    .replace(/{horario}/g, "14:00")}
+                </div>
+              </div>
+
+              <button type="submit" style={{ background: "#4338CA", color: "#fff", border: "none", borderRadius: 10, padding: "11px", fontSize: 14, cursor: "pointer", fontWeight: 500, marginTop: 4 }}>
+                Salvar configurações
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* MODAL CLIENTE */}
@@ -256,15 +355,15 @@ export default function DashboardPage() {
             <form onSubmit={salvarCliente} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Nome completo</label>
-                <input required value={formCliente.nome} onChange={e => setFormCliente({...formCliente, nome: e.target.value})} placeholder="Maria Silva" style={{ width: "100%", border: "1px solid #E5E7EB", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box" }} />
+                <input required value={formCliente.nome} onChange={e => setFormCliente({...formCliente, nome: e.target.value})} placeholder="Maria Silva" style={inputStyle} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>WhatsApp (com DDD)</label>
-                <input required value={formCliente.telefone} onChange={e => setFormCliente({...formCliente, telefone: e.target.value})} placeholder="5533999999999" style={{ width: "100%", border: "1px solid #E5E7EB", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box" }} />
+                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>WhatsApp (com DDI+DDD)</label>
+                <input required value={formCliente.telefone} onChange={e => setFormCliente({...formCliente, telefone: e.target.value})} placeholder="5533999999999" style={inputStyle} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Serviço favorito</label>
-                <input value={formCliente.servicoFavorito} onChange={e => setFormCliente({...formCliente, servicoFavorito: e.target.value})} placeholder="Corte, manicure, barba..." style={{ width: "100%", border: "1px solid #E5E7EB", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box" }} />
+                <input value={formCliente.servicoFavorito} onChange={e => setFormCliente({...formCliente, servicoFavorito: e.target.value})} placeholder="Corte, manicure, barba..." style={inputStyle} />
               </div>
               {erro && <p style={{ fontSize: 12, color: "#DC2626", background: "#FEF2F2", padding: "8px 12px", borderRadius: 8 }}>{erro}</p>}
               <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
@@ -284,7 +383,7 @@ export default function DashboardPage() {
             <form onSubmit={salvarAgendamento} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Cliente</label>
-                <select required value={formAgend.clienteId} onChange={e => setFormAgend({...formAgend, clienteId: e.target.value})} style={{ width: "100%", border: "1px solid #E5E7EB", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box" }}>
+                <select required value={formAgend.clienteId} onChange={e => setFormAgend({...formAgend, clienteId: e.target.value})} style={inputStyle}>
                   <option value="">Selecione um cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </select>
@@ -292,11 +391,11 @@ export default function DashboardPage() {
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Serviço</label>
-                <input required value={formAgend.servico} onChange={e => setFormAgend({...formAgend, servico: e.target.value})} placeholder="Corte, manicure, consulta..." style={{ width: "100%", border: "1px solid #E5E7EB", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box" }} />
+                <input required value={formAgend.servico} onChange={e => setFormAgend({...formAgend, servico: e.target.value})} placeholder="Corte, manicure, consulta..." style={inputStyle} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4 }}>Data e hora</label>
-                <input required type="datetime-local" value={formAgend.dataHora} onChange={e => setFormAgend({...formAgend, dataHora: e.target.value})} style={{ width: "100%", border: "1px solid #E5E7EB", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box" }} />
+                <input required type="datetime-local" value={formAgend.dataHora} onChange={e => setFormAgend({...formAgend, dataHora: e.target.value})} style={inputStyle} />
               </div>
               {erro && <p style={{ fontSize: 12, color: "#DC2626", background: "#FEF2F2", padding: "8px 12px", borderRadius: 8 }}>{erro}</p>}
               <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
