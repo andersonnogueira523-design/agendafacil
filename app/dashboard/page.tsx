@@ -25,6 +25,29 @@ interface Tenant {
   msgTemplate: string;
 }
 
+const TEMPLATES = [
+  {
+    label: "💇 Salão / Barbearia",
+    texto: "Oi {nome}! Tudo bem? 😊\n\nLembrando que você tem *{servico}* hoje às *{horario}* aqui no nosso salão.\n\nConfirma sua presença?\n👉 *Sim, vou!* / *Não consigo ir*",
+  },
+  {
+    label: "💅 Manicure / Estética",
+    texto: "Olá {nome}! 💅\n\nSua sessão de *{servico}* está confirmada para hoje às *{horario}*.\n\nVocê vai comparecer?\n✅ *Sim* / ❌ *Preciso cancelar*",
+  },
+  {
+    label: "🏥 Clínica / Consultório",
+    texto: "Olá, {nome}!\n\nLembramos que você tem uma consulta de *{servico}* hoje às *{horario}*.\n\nPor favor, confirme sua presença:\n✅ *Confirmo* / ❌ *Preciso remarcar*",
+  },
+  {
+    label: "🐾 Pet Shop / Veterinária",
+    texto: "Oi {nome}! 🐾\n\nLembrando que o banho e tosa do seu pet está agendado para hoje às *{horario}*.\n\nConfirma?\n👉 *Sim!* / *Não vou conseguir*",
+  },
+  {
+    label: "💪 Academia / Personal",
+    texto: "Oi {nome}! 💪\n\nSeu treino de *{servico}* está marcado para hoje às *{horario}*.\n\nVai aparecer?\n✅ *Sim, vou!* / ❌ *Não consigo hoje*",
+  },
+];
+
 const statusStyle: Record<string, { bg: string; text: string; label: string }> = {
   CONFIRMADO: { bg: "#E1F5EE", text: "#085041", label: "✓ Confirmado" },
   CANCELADO:  { bg: "#FCEBEB", text: "#791F1F", label: "✕ Cancelou" },
@@ -39,11 +62,9 @@ const textColors = ["#3C3489","#085041","#712B13","#0C447C","#633806"];
 function formatHora(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
-
 function formatData(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
-
 function initials(nome: string) {
   return nome.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 }
@@ -70,6 +91,7 @@ export default function DashboardPage() {
   const [formCliente, setFormCliente] = useState({ nome: "", telefone: "", servicoFavorito: "" });
   const [formAgend, setFormAgend] = useState({ clienteId: "", servico: "", dataHora: "" });
   const [formConfig, setFormConfig] = useState({ nome: "", whatsappNumber: "", msgTemplate: "" });
+  const [templateSelecionado, setTemplateSelecionado] = useState<number | null>(null);
 
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
@@ -88,11 +110,7 @@ export default function DashboardPage() {
       setAgendamentos(a.data ?? []);
       if (t.data) {
         setTenant(t.data);
-        setFormConfig({
-          nome: t.data.nome,
-          whatsappNumber: t.data.whatsappNumber,
-          msgTemplate: t.data.msgTemplate,
-        });
+        setFormConfig({ nome: t.data.nome, whatsappNumber: t.data.whatsappNumber, msgTemplate: t.data.msgTemplate });
       }
     } finally {
       setLoading(false);
@@ -101,9 +119,13 @@ export default function DashboardPage() {
 
   useEffect(() => { carregarDados(); }, []);
 
+  function selecionarTemplate(i: number) {
+    setTemplateSelecionado(i);
+    setFormConfig(f => ({ ...f, msgTemplate: TEMPLATES[i].texto }));
+  }
+
   async function salvarCliente(e: React.FormEvent) {
-    e.preventDefault();
-    setErro(""); setSucesso("");
+    e.preventDefault(); setErro(""); setSucesso("");
     const res = await fetch("/api/clientes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -118,8 +140,7 @@ export default function DashboardPage() {
   }
 
   async function salvarAgendamento(e: React.FormEvent) {
-    e.preventDefault();
-    setErro(""); setSucesso("");
+    e.preventDefault(); setErro(""); setSucesso("");
     const res = await fetch("/api/agendamentos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -134,16 +155,11 @@ export default function DashboardPage() {
   }
 
   async function salvarConfig(e: React.FormEvent) {
-    e.preventDefault();
-    setErro(""); setSucesso("");
+    e.preventDefault(); setErro(""); setSucesso("");
     const res = await fetch("/api/tenant", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nome: formConfig.nome,
-        whatsappNumber: formConfig.whatsappNumber.replace(/\D/g,""),
-        msgTemplate: formConfig.msgTemplate,
-      }),
+      body: JSON.stringify({ nome: formConfig.nome, whatsappNumber: formConfig.whatsappNumber.replace(/\D/g,""), msgTemplate: formConfig.msgTemplate }),
     });
     const data = await res.json();
     if (!res.ok) { setErro(data.error ?? "Erro ao salvar"); return; }
@@ -196,7 +212,6 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 20px" }}>
-
         {sucesso && <div style={{ background: "#E1F5EE", color: "#085041", padding: "10px 16px", borderRadius: 10, marginBottom: 16, fontSize: 13 }}>✓ {sucesso}</div>}
         {erro && <div style={{ background: "#FEF2F2", color: "#DC2626", padding: "10px 16px", borderRadius: 10, marginBottom: 16, fontSize: 13 }}>{erro}</div>}
 
@@ -305,44 +320,63 @@ export default function DashboardPage() {
 
         {/* CONFIGURAÇÕES */}
         {aba === "config" && (
-          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #E5E7EB", padding: 28 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, color: "#111", marginBottom: 6 }}>Configurações do negócio</h2>
-            <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 24 }}>Edite as informações do seu negócio e personalize a mensagem enviada aos clientes.</p>
-            <form onSubmit={salvarConfig} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <div>
-                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>Nome do negócio</label>
-                <input value={formConfig.nome} onChange={e => setFormConfig({...formConfig, nome: e.target.value})} placeholder="Salão Beleza & Arte" style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>WhatsApp do negócio (com DDI+DDD)</label>
-                <input value={formConfig.whatsappNumber} onChange={e => setFormConfig({...formConfig, whatsappNumber: e.target.value})} placeholder="5533999999999" style={inputStyle} />
-                <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Número que aparecerá como remetente das mensagens.</p>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>Mensagem de confirmação</label>
-                <textarea
-                  value={formConfig.msgTemplate}
-                  onChange={e => setFormConfig({...formConfig, msgTemplate: e.target.value})}
-                  rows={4}
-                  style={{ ...inputStyle, resize: "vertical" as const }}
-                />
-                <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Use <strong>{"{nome}"}</strong>, <strong>{"{servico}"}</strong> e <strong>{"{horario}"}</strong> para personalizar.</p>
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-              <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "14px 16px", border: "1px solid #E5E7EB" }}>
-                <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 8, fontWeight: 500 }}>Preview da mensagem</div>
-                <div style={{ fontSize: 13, color: "#111", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                  {formConfig.msgTemplate
-                    .replace(/{nome}/g, "Maria Silva")
-                    .replace(/{servico}/g, "Corte")
-                    .replace(/{horario}/g, "14:00")}
+            {/* Dados do negócio */}
+            <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #E5E7EB", padding: 24 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 600, color: "#111", marginBottom: 18 }}>Dados do negócio</h2>
+              <form onSubmit={salvarConfig} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>Nome do negócio</label>
+                  <input value={formConfig.nome} onChange={e => setFormConfig({...formConfig, nome: e.target.value})} placeholder="Salão Beleza & Arte" style={inputStyle} />
                 </div>
-              </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>WhatsApp do negócio (com DDI+DDD)</label>
+                  <input value={formConfig.whatsappNumber} onChange={e => setFormConfig({...formConfig, whatsappNumber: e.target.value})} placeholder="5533999999999" style={inputStyle} />
+                  <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Número que aparecerá como remetente das mensagens.</p>
+                </div>
 
-              <button type="submit" style={{ background: "#4338CA", color: "#fff", border: "none", borderRadius: 10, padding: "11px", fontSize: 14, cursor: "pointer", fontWeight: 500, marginTop: 4 }}>
-                Salvar configurações
-              </button>
-            </form>
+                {/* Templates prontos */}
+                <div>
+                  <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 8, fontWeight: 500 }}>Modelos prontos — clique para usar</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    {TEMPLATES.map((t, i) => (
+                      <button key={i} type="button" onClick={() => selecionarTemplate(i)}
+                        style={{ fontSize: 12, padding: "6px 14px", borderRadius: 20, border: `1.5px solid ${templateSelecionado === i ? "#4338CA" : "#E5E7EB"}`, background: templateSelecionado === i ? "#EEF2FF" : "#fff", color: templateSelecionado === i ? "#4338CA" : "#374151", cursor: "pointer", fontWeight: templateSelecionado === i ? 600 : 400 }}>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Textarea da mensagem */}
+                <div>
+                  <label style={{ fontSize: 12, color: "#6B7280", display: "block", marginBottom: 4, fontWeight: 500 }}>Mensagem de confirmação</label>
+                  <textarea
+                    value={formConfig.msgTemplate}
+                    onChange={e => { setFormConfig({...formConfig, msgTemplate: e.target.value}); setTemplateSelecionado(null); }}
+                    rows={5}
+                    style={{ ...inputStyle, resize: "vertical" as const, lineHeight: 1.6 }}
+                  />
+                  <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Use <strong>{"{nome}"}</strong>, <strong>{"{servico}"}</strong> e <strong>{"{horario}"}</strong> para personalizar.</p>
+                </div>
+
+                {/* Preview */}
+                <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "14px 16px", border: "1px solid #E5E7EB" }}>
+                  <div style={{ fontSize: 11, color: "#6B7280", marginBottom: 8, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>Preview da mensagem</div>
+                  <div style={{ fontSize: 13, color: "#111", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                    {formConfig.msgTemplate
+                      .replace(/{nome}/g, "Maria Silva")
+                      .replace(/{servico}/g, "Corte e escova")
+                      .replace(/{horario}/g, "14:00")}
+                  </div>
+                </div>
+
+                <button type="submit" style={{ background: "#4338CA", color: "#fff", border: "none", borderRadius: 10, padding: "11px", fontSize: 14, cursor: "pointer", fontWeight: 500 }}>
+                  Salvar configurações
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </div>
