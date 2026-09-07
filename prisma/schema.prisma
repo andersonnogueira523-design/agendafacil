@@ -36,18 +36,27 @@ enum StatusMensagem {
 
 model Tenant {
   id             String   @id @default(uuid())
-  clerkOrgId     String   @unique
   nome           String
   whatsappNumber String
   plano          Plano    @default(FREE)
   msgTemplate    String   @default("Oi {nome}! Voce tem {servico} hoje as {horario}. Confirma? Sim / Nao consigo ir")
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
-
+  usuarios     Usuario[]
   clientes     Cliente[]
   agendamentos Agendamento[]
+}
 
-  @@index([clerkOrgId])
+model Usuario {
+  id        String   @id @default(uuid())
+  tenantId  String
+  nome      String
+  email     String   @unique
+  senha     String
+  createdAt DateTime @default(now())
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([email])
+  @@index([tenantId])
 }
 
 model Cliente {
@@ -59,10 +68,8 @@ model Cliente {
   totalVisitas    Int      @default(0)
   ativo           Boolean  @default(true)
   createdAt       DateTime @default(now())
-
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   agendamentos Agendamento[]
-
   @@unique([tenantId, telefone])
   @@index([tenantId])
 }
@@ -76,11 +83,9 @@ model Agendamento {
   status     StatusAgendamento @default(PENDENTE)
   observacao String?
   createdAt  DateTime          @default(now())
-
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   cliente   Cliente    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   mensagens Mensagem[]
-
   @@index([tenantId, dataHora])
 }
 
@@ -93,8 +98,6 @@ model Mensagem {
   enviadaEm       DateTime?
   respondidaEm    DateTime?
   createdAt       DateTime       @default(now())
-
   agendamento Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
-
   @@index([agendamentoId])
 }
