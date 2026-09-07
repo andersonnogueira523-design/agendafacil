@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { enviarMensagem } from "@/lib/whatsapp";
-import { montarMensagem } from "@/lib/tenant";
+import { montarMensagem } from "@/lib/auth";
 import { addHours, isAfter, isBefore } from "date-fns";
 
 export const dynamic = "force-dynamic";

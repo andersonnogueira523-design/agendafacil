@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getTenant } from "@/lib/tenant";
+import { getTenant } from "@/lib/auth";
 import { startOfDay, endOfDay, parseISO, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { enviarMensagem } from "@/lib/whatsapp";
-import { montarMensagem } from "@/lib/tenant";
+import { montarMensagem } from "@/lib/auth";
 
 const schema = z.object({
   clienteId: z.string().uuid(),

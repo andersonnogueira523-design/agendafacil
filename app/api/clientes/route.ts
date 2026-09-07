@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getTenant } from "@/lib/tenant";
+import { getTenant } from "@/lib/auth";
 
 const schema = z.object({
   nome: z.string().min(2),

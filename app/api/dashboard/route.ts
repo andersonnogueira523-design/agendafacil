@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getTenant } from "@/lib/tenant";
+import { getTenant } from "@/lib/auth";
 import { startOfDay, endOfDay } from "date-fns";
 
 export async function GET() {
