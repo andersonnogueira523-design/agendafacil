@@ -1,10 +1,10 @@
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, jwtVerify, JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "agendafacil-secret-2025");
 
-export interface SessionPayload {
+export interface SessionPayload extends JWTPayload {
   userId: string;
   tenantId: string;
   email: string;
@@ -17,7 +17,7 @@ export async function criarToken(payload: SessionPayload): Promise<string> {
 export async function verificarToken(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, SECRET);
-    return payload as unknown as SessionPayload;
+    return payload as SessionPayload;
   } catch { return null; }
 }
 
